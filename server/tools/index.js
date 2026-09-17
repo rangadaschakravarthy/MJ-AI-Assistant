@@ -7,6 +7,7 @@ import { dsaTools } from './dsaTools.js';
 import { productivityTools } from './productivityTools.js';
 import { deviceTools } from './deviceTools.js';
 import { dataTools } from './dataTools.js';
+import { interviewTools } from './interviewTools.js';
 
 export const allTools = {
   ...osTools,
@@ -18,6 +19,7 @@ export const allTools = {
   ...productivityTools,
   ...deviceTools,
   ...dataTools,
+  ...interviewTools,
 };
 
 export async function executeTool(toolName, args = {}) {

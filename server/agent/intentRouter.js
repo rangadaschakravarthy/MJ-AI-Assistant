@@ -42,6 +42,33 @@ export function routeIntent(text) {
     return { tool: 'switch_mode', args: { mode: 'chat' } };
   }
 
+  // 4.5. Mock Interview Router
+  if (
+    clean.includes('start interview') ||
+    clean.includes('take my interview') ||
+    clean.includes('interview me') ||
+    clean.includes('mock interview') ||
+    clean.includes('practice interview') ||
+    clean.startsWith('interview for ')
+  ) {
+    let role = 'Software Engineer / AI Developer';
+    const match = clean.match(/(?:interview\s+me\s+for|interview\s+for|mock\s+interview\s+for|practice\s+interview\s+for)\s+(.+)/i);
+    if (match && match[1]) {
+      role = match[1].trim();
+    }
+    return { tool: 'start_interview', args: { role, topic: text } };
+  }
+
+  if (
+    clean.includes('stop interview') ||
+    clean.includes('end interview') ||
+    clean.includes('quit interview') ||
+    clean.includes('exit interview') ||
+    clean.includes('cancel interview')
+  ) {
+    return { tool: 'end_interview', args: {} };
+  }
+
   if (
     clean.includes('switch to voice') ||
     clean.includes('return to orb') ||

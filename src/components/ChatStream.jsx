@@ -25,6 +25,7 @@ export default function ChatStream({
   };
 
   const quickPills = [
+    { label: 'Start Mock Interview', cmd: 'Start mock interview for AI Developer', icon: Sparkles },
     { label: 'Launch VS Code', cmd: 'Open VS Code', icon: Code },
     { label: 'Search React Docs', cmd: 'Search Google for React docs', icon: Compass },
     { label: 'Check System RAM', cmd: 'Check system status', icon: Cpu },
