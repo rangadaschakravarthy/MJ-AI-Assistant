@@ -2,11 +2,14 @@ import { spawn, exec } from 'child_process';
 import { memoryStore } from '../memory/memoryStore.js';
 
 function launchDesktopTarget(targetUrl) {
+  console.log(`[launchDesktopTarget] Opening target URL/App: "${targetUrl}"`);
   if (process.platform === 'win32') {
-    exec(`powershell -c "Start-Process '${targetUrl}'"`, (err) => {
+    // Escape ampersands for cmd if necessary, or use PowerShell Start-Process with double quotes
+    const safeUrl = targetUrl.replace(/"/g, '""');
+    exec(`cmd.exe /c start "" "${safeUrl}"`, (err) => {
       if (err) {
-        console.warn('[deviceTools] PowerShell launch error, trying cmd fallback:', err.message);
-        exec(`cmd.exe /c start "" "${targetUrl}"`);
+        console.warn('[deviceTools] cmd.exe launch failed, trying PowerShell fallback:', err.message);
+        exec(`powershell -c "Start-Process '${safeUrl}'"`);
       }
     });
   } else if (process.platform === 'darwin') {

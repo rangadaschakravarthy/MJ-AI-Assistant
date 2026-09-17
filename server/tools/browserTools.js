@@ -14,12 +14,13 @@ async function getPage() {
 }
 
 function launchDesktopTarget(targetUrl) {
+  console.log(`[browserTools] Opening target URL/App: "${targetUrl}"`);
   if (process.platform === 'win32') {
-    // PowerShell Start-Process is 100% reliable on Windows for URLs, apps & protocols
-    exec(`powershell -c "Start-Process '${targetUrl}'"`, (err) => {
+    const safeUrl = targetUrl.replace(/"/g, '""');
+    exec(`cmd.exe /c start "" "${safeUrl}"`, (err) => {
       if (err) {
-        console.warn('[browserTools] PowerShell launch error, trying cmd fallback:', err.message);
-        exec(`cmd.exe /c start "" "${targetUrl}"`);
+        console.warn('[browserTools] cmd.exe launch failed, trying PowerShell fallback:', err.message);
+        exec(`powershell -c "Start-Process '${safeUrl}'"`);
       }
     });
   } else if (process.platform === 'darwin') {

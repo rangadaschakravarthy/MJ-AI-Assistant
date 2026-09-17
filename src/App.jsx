@@ -221,6 +221,33 @@ export default function App() {
         setPermissions(data.permissions);
         break;
 
+      case 'REMINDER_TRIGGERED':
+        setAssistantState('SPEAKING');
+        const reminderMsg = {
+          sender: 'mj',
+          text: data.reminder.message,
+          timestamp: new Date().toLocaleTimeString(),
+          toolExecutions: [{ name: 'reminder_triggered', args: { title: data.reminder.title }, status: 'success' }]
+        };
+        setMessages(prev => [...prev, reminderMsg]);
+        speak(data.reminder.message);
+        break;
+
+      case 'SWITCH_TAB':
+        if (data.tab) {
+          setActiveTab(data.tab);
+        }
+        break;
+
+      case 'SHUTDOWN_MJ':
+        setAssistantState('IDLE');
+        setMicEnabled(false);
+        if (audioServiceRef.current) {
+          audioServiceRef.current.stopMicrophone();
+        }
+        speak("Goodbye! MJ is now shutting down.");
+        break;
+
       default:
         break;
     }
@@ -385,6 +412,19 @@ export default function App() {
     setAssistantState('IDLE');
   };
 
+  const handleChoiceAction = (selectedChoice) => {
+    if (confirmationRequest && wsRef.current) {
+      wsRef.current.send(JSON.stringify({
+        type: 'CONFIRM_AUTHORIZATION',
+        requestId: confirmationRequest.id,
+        approved: true,
+        choice: selectedChoice
+      }));
+    }
+    setConfirmationRequest(null);
+    setAssistantState('WORKING');
+  };
+
   return (
     <div className="min-h-screen p-4 sm:p-6 max-w-[1600px] mx-auto flex flex-col font-sans">
       {/* Top Header Navigation */}
@@ -399,11 +439,12 @@ export default function App() {
         onOpenScreenShare={() => setIsScreenShareOpen(true)}
       />
 
-      {/* Confirmation Modal overlay for sensitive operations */}
+      {/* Confirmation Modal overlay for sensitive operations or Editor choice */}
       <ConfirmationModal
         confirmationRequest={confirmationRequest}
         onConfirm={handleConfirmAction}
         onCancel={handleCancelAction}
+        onChoice={handleChoiceAction}
       />
 
       {/* Screen Share Vision Modal */}

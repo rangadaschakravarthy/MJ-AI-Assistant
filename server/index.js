@@ -10,6 +10,8 @@ import { ActivityTracker } from './memory/activityTracker.js';
 import { ProjectTracker } from './memory/projectTracker.js';
 import { AgentCore } from './agent/agentCore.js';
 
+import { setBroadcaster } from './tools/productivityTools.js';
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
@@ -25,6 +27,8 @@ function broadcast(data) {
     }
   });
 }
+
+setBroadcaster(broadcast);
 
 const permissionManager = new PermissionManager();
 const auditLogger = new AuditLogger(broadcast);
@@ -62,7 +66,7 @@ wss.on('connection', (ws) => {
       if (data.type === 'USER_INPUT') {
         await agentCore.processInput(data.text, sendWsMessage, data.image || null, data.language || 'en');
       } else if (data.type === 'CONFIRM_AUTHORIZATION') {
-        await agentCore.handleAuthorization(data.requestId, data.approved, sendWsMessage);
+        await agentCore.handleAuthorization(data.requestId, data.approved, sendWsMessage, data.choice || null);
       }
     } catch (err) {
       console.error('[MJ Server WS Error]:', err);

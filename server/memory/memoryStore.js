@@ -16,7 +16,17 @@ export class MemoryStore {
     try {
       if (fs.existsSync(MEMORY_FILE)) {
         const raw = fs.readFileSync(MEMORY_FILE, 'utf-8');
-        this.memories = JSON.parse(raw);
+        const loaded = JSON.parse(raw);
+        // Deduplicate memories by key on load
+        const seenKeys = new Set();
+        this.memories = [];
+        for (const item of loaded) {
+          const k = (item.key || '').toLowerCase();
+          if (!seenKeys.has(k)) {
+            seenKeys.add(k);
+            this.memories.push(item);
+          }
+        }
       } else {
         // Initial default memory setup
         this.memories = [
@@ -50,6 +60,16 @@ export class MemoryStore {
   }
 
   addMemory(category, key, value) {
+    const existingIndex = this.memories.findIndex(m => m.key.toLowerCase() === key.toLowerCase());
+    if (existingIndex !== -1) {
+      // Replace/Update existing memory entry
+      this.memories[existingIndex].value = value;
+      this.memories[existingIndex].timestamp = new Date().toLocaleString();
+      if (category) this.memories[existingIndex].category = category;
+      this.save();
+      return this.memories[existingIndex];
+    }
+
     const entry = {
       id: `mem_${Date.now()}`,
       category,

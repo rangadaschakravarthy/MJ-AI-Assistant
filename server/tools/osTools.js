@@ -48,11 +48,13 @@ const APP_REGISTRY = {
 };
 
 function launchDesktopTarget(targetUrl) {
+  console.log(`[osTools] Opening target URL/App: "${targetUrl}"`);
   if (process.platform === 'win32') {
-    exec(`powershell -c "Start-Process '${targetUrl}'"`, (err) => {
+    const safeUrl = targetUrl.replace(/"/g, '""');
+    exec(`cmd.exe /c start "" "${safeUrl}"`, (err) => {
       if (err) {
-        console.warn('[osTools] PowerShell launch error, trying cmd fallback:', err.message);
-        exec(`cmd.exe /c start "" "${targetUrl}"`);
+        console.warn('[osTools] cmd.exe launch failed, trying PowerShell fallback:', err.message);
+        exec(`powershell -c "Start-Process '${safeUrl}'"`);
       }
     });
   } else if (process.platform === 'darwin') {
@@ -79,6 +81,12 @@ export const osTools = {
     else if (cleanName.includes('chrome')) target = 'chrome';
 
     console.log(`[osTools] Opening app/URL: "${name}" -> clean: "${cleanName}" -> target: "${target}"`);
+
+    // Delegate folder/file queries if passed to open_application
+    if (cleanName.includes('folder') || cleanName.includes('directory') || cleanName.includes('in downloads') || cleanName.includes('in documents') || cleanName.includes('on desktop')) {
+      const { fileTools } = await import('./fileTools.js');
+      return fileTools.open_folder({ folderPath: name });
+    }
 
     // If target is VS Code
     if (target === 'code') {
@@ -131,6 +139,10 @@ export const osTools = {
         const { stdout } = await execAsync(`where ${target}`).catch(() => ({ stdout: '' }));
         
         if (!stdout.trim() && !['calc', 'notepad', 'explorer', 'cmd', 'powershell', 'code', 'chrome', 'msedge', 'spotify', 'excel', 'winword'].includes(target)) {
+          if (cleanName.includes('folder') || cleanName.includes('file') || cleanName.includes('directory') || cleanName.includes('downloads') || cleanName.includes('documents') || cleanName.includes('desktop')) {
+            const { fileTools } = await import('./fileTools.js');
+            return fileTools.open_folder({ folderPath: name });
+          }
           const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(cleanName + ' official site')}`;
           console.log(`[osTools] Local app "${cleanName}" not found. Falling back to browser search: ${searchUrl}`);
           launchDesktopTarget(searchUrl);
@@ -342,5 +354,30 @@ export const osTools = {
         message: `Couldn't lock workstation: ${err.message}`
       };
     }
+  },
+
+  /**
+   * Switch assistant UI mode (assistant/orb vs coding/chat)
+   */
+  async switch_mode({ mode = 'assistant' }) {
+    const targetTab = (mode === 'chat' || mode === 'coding' || mode === 'work') ? 'coding' : 'assistant';
+    return {
+      status: 'success',
+      targetTab,
+      message: `Yep, switching to ${targetTab === 'coding' ? 'Chat / Coding Workspace' : 'Voice Assistant Mode'}.`
+    };
+  },
+
+  /**
+   * Graceful Shutdown of MJ Assistant
+   */
+  async shutdown_mj() {
+    console.log('[osTools] MJ Shutdown requested by user voice/command.');
+    return {
+      status: 'success',
+      action: 'SHUTDOWN_MJ',
+      message: 'Goodbye! MJ is going offline and shutting down cleanly.'
+    };
   }
 };
+

@@ -51,6 +51,61 @@ export class AgentCore {
         this.auditLogger.log('TOOL_EXECUTION', intent.tool, toolResult.message || JSON.stringify(toolResult));
         this.activityTracker.recordActivity('TOOL_EXECUTION', intent.tool, intent.args);
 
+        if (toolResult.status === 'requires_app_choice') {
+          const requestId = `choice_${Date.now()}`;
+          this.pendingAuthorizations.set(requestId, {
+            intent: { tool: 'open_file', args: { filePath: toolResult.filePath } },
+            sendWsMessage
+          });
+
+          sendWsMessage({
+            type: 'CONFIRMATION_REQUIRED',
+            request: {
+              id: requestId,
+              title: `Open ${toolResult.filename}`,
+              description: `Should I open ${toolResult.filename} in VS Code or Notepad?`,
+              riskLevel: 'CHOICE',
+              target: toolResult.filePath,
+              choices: [
+                { label: 'VS Code', value: 'vscode' },
+                { label: 'Notepad', value: 'notepad' }
+              ]
+            }
+          });
+          return;
+        }
+
+        if (toolResult.status === 'requires_folder_creation') {
+          const requestId = `create_folder_${Date.now()}`;
+          this.pendingAuthorizations.set(requestId, {
+            intent: {
+              tool: 'create_folder',
+              args: {
+                folderName: toolResult.folderName,
+                location: toolResult.location,
+                app: toolResult.app
+              }
+            },
+            sendWsMessage
+          });
+
+          sendWsMessage({
+            type: 'CONFIRMATION_REQUIRED',
+            request: {
+              id: requestId,
+              title: `Folder Not Found: ${toolResult.folderName}`,
+              description: `There is no folder named "${toolResult.folderName}". Would you like me to create it?`,
+              riskLevel: 'CHOICE',
+              target: toolResult.folderName,
+              choices: [
+                { label: 'Create Folder', value: 'create' },
+                { label: 'Cancel', value: 'cancel' }
+              ]
+            }
+          });
+          return;
+        }
+
         const responseText = formatMjResponse(toolResult.message || `Yep, executed ${intent.tool}.`, intent.tool);
 
         sendWsMessage({
@@ -58,6 +113,20 @@ export class AgentCore {
           text: responseText,
           toolExecutions: [{ name: intent.tool, args: intent.args, status: toolResult.status || 'success' }]
         });
+
+        if (intent.tool === 'switch_mode' && toolResult.targetTab) {
+          sendWsMessage({
+            type: 'SWITCH_TAB',
+            tab: toolResult.targetTab
+          });
+        }
+
+        if (intent.tool === 'shutdown_mj') {
+          sendWsMessage({
+            type: 'SHUTDOWN_MJ'
+          });
+        }
+
         return;
       }
     }
@@ -115,29 +184,35 @@ export class AgentCore {
     });
   }
 
-  async handleAuthorization(requestId, approved, sendWsMessage) {
+  async handleAuthorization(requestId, approved, sendWsMessage, choice = null) {
     const pending = this.pendingAuthorizations.get(requestId);
     if (!pending) return;
 
     this.pendingAuthorizations.delete(requestId);
 
-    if (!approved) {
-      this.auditLogger.log('TOOL_CANCELLED', pending.intent.tool, 'User denied confirmation prompt', 'CANCELLED');
+    if (!approved && (!choice || choice === 'cancel')) {
+      this.auditLogger.log('TOOL_CANCELLED', pending.intent.tool, 'User cancelled action/choice', 'CANCELLED');
       sendWsMessage({
         type: 'RESPONSE',
-        text: "Gotcha. Action cancelled.",
+        text: formatMjResponse("Gotcha, I won't create the folder.", pending.intent.tool),
         toolExecutions: []
       });
       return;
     }
 
-    const toolResult = await executeTool(pending.intent.tool, pending.intent.args);
+    let finalArgs = { ...pending.intent.args };
+    if (pending.intent.tool === 'open_file') {
+      const selectedApp = choice || (approved ? 'vscode' : 'notepad');
+      finalArgs.app = selectedApp;
+    }
+
+    const toolResult = await executeTool(pending.intent.tool, finalArgs);
     this.auditLogger.log('TOOL_EXECUTION', pending.intent.tool, toolResult.message || JSON.stringify(toolResult));
 
     sendWsMessage({
       type: 'RESPONSE',
       text: formatMjResponse(toolResult.message || "Done.", pending.intent.tool),
-      toolExecutions: [{ name: pending.intent.tool, args: pending.intent.args, status: toolResult.status || 'success' }]
+      toolExecutions: [{ name: pending.intent.tool, args: finalArgs, status: toolResult.status || 'success' }]
     });
   }
 
